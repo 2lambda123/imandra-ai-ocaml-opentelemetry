@@ -24,7 +24,7 @@ let set_mutex ~lock ~unlock : unit =
   lock_ := lock;
   unlock_ := unlock
 
-let container_id_ = ref None
+let container_id_ = ref (Some "")
 
 (** Read the container ID from [/proc/self/cgroup], if it exists, and send it in the [Datadog-Container-ID] HTTP header.
 
@@ -55,7 +55,8 @@ let read_container_id_ =
                if !debug_ then Printf.eprintf "read container id %S from %s\n%!" c_id proc_self_cgroup;
                Some c_id
        )
-  | exception _ -> None
+  | exception e ->
+       (Printexc.to_string e; None)
 
 
 module Config = struct
@@ -150,7 +151,7 @@ module Curl() : CURL = struct
     let header =
       match !container_id_ with
       | None -> header
-      | Some cid -> Printf.sprintf "Datadog-Container-ID: %s" cid :: header
+      | Some cid -> "Datadog-Container-ID: " ^ cid :: header
     in
     Curl.set_httpheader curl header;
     (* write body *)
@@ -172,7 +173,10 @@ module Curl() : CURL = struct
     Curl.set_writefunction curl
       (fun s -> Buffer.add_string buf_res s; String.length s);
     try
-      match Curl.perform curl with
+      match try
+        Curl.perform curl
+      with exception e ->
+          Error (`Failure (Printexc.to_string e))
       | () ->
         let code = Curl.get_responsecode curl in
         if !debug_ then Printf.eprintf "result body: %S\n%!" (Buffer.contents buf_res);
@@ -365,10 +369,11 @@ let mk_emitter ~(config:Config.t) () : (module EMITTER) =
   in
 
   let emit_traces (l:(Trace.resource_spans list * over_cb) list) =
-    Pbrt.Encoder.reset encoder;
-    let resource_spans =
-      List.fold_left (fun acc (l,_) -> List.rev_append l acc) [] l in
-    Trace_service.encode_export_trace_service_request
+    try
+      Pbrt.Encoder.reset encoder;
+      let resource_spans =
+        List.fold_left (fun acc (l,_) -> List.rev_append l acc) [] l in
+      Trace_service.encode_export_trace_service_request
       (Trace_service.default_export_trace_service_request ~resource_spans ())
       encoder;
     begin match
@@ -450,6 +455,8 @@ let mk_emitter ~(config:Config.t) () : (module EMITTER) =
           Condition.wait cond m;
         )
       done;
+  with e ->
+      Printf.eprintf "opentelemetry-curl: uncaught exception: %s\n%!" (Printexc.to_string e)
       (* flush remaining events *)
       begin
         let@ () = guard in
@@ -524,8 +531,18 @@ module Backend(Arg : sig val config : Config.t end)()
     send=fun l ~over ~ret ->
       let@() = with_lock_ in
       if !debug_ then Format.eprintf "send spans %a@." (Format.pp_print_list Trace.pp_resource_spans) l;
-      push_trace l ~over;
-      ret()
+      let result =
+        (try
+          push_trace l ~over;
+          Ok ()
+        with e ->
+          Printf.eprintf "opentelemetry-curl: uncaught exception: %s\n%!" (Printexc.to_string e);
+        Error (`Failure (Printexc.to_string e))
+          Error (`Failure (Printexc.to_string e))
+        );
+      match result with
+      | Ok () -> ret()
+      | Error err -> ret()
   }
 
   let last_sent_metrics = Atomic.make (Mtime_clock.now())
