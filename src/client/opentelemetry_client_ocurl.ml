@@ -55,7 +55,8 @@ let read_container_id_ =
                if !debug_ then Printf.eprintf "read container id %S from %s\n%!" c_id proc_self_cgroup;
                Some c_id
        )
-  | exception _ -> None
+  | exception e ->
+       (Printexc.to_string e; None)
 
 
 module Config = struct
