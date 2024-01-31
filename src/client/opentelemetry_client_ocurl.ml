@@ -455,6 +455,8 @@ let mk_emitter ~(config:Config.t) () : (module EMITTER) =
           Condition.wait cond m;
         )
       done;
+  with e ->
+      Printf.eprintf "opentelemetry-curl: uncaught exception: %s\n%!" (Printexc.to_string e)
       (* flush remaining events *)
       begin
         let@ () = guard in
