@@ -369,10 +369,11 @@ let mk_emitter ~(config:Config.t) () : (module EMITTER) =
   in
 
   let emit_traces (l:(Trace.resource_spans list * over_cb) list) =
-    Pbrt.Encoder.reset encoder;
-    let resource_spans =
-      List.fold_left (fun acc (l,_) -> List.rev_append l acc) [] l in
-    Trace_service.encode_export_trace_service_request
+    try
+      Pbrt.Encoder.reset encoder;
+      let resource_spans =
+        List.fold_left (fun acc (l,_) -> List.rev_append l acc) [] l in
+      Trace_service.encode_export_trace_service_request
       (Trace_service.default_export_trace_service_request ~resource_spans ())
       encoder;
     begin match
