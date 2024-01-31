@@ -176,7 +176,7 @@ module Curl() : CURL = struct
       match try
         Curl.perform curl
       with exception e ->
-      Error (`Failure (Printexc.to_string e)) with
+          Error (`Failure (Printexc.to_string e))
       | () ->
         let code = Curl.get_responsecode curl in
         if !debug_ then Printf.eprintf "result body: %S\n%!" (Buffer.contents buf_res);
