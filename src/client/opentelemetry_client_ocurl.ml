@@ -173,7 +173,10 @@ module Curl() : CURL = struct
     Curl.set_writefunction curl
       (fun s -> Buffer.add_string buf_res s; String.length s);
     try
-      match Curl.perform curl with
+      match try
+        Curl.perform curl
+      with exception e ->
+      Error (`Failure (Printexc.to_string e)) with
       | () ->
         let code = Curl.get_responsecode curl in
         if !debug_ then Printf.eprintf "result body: %S\n%!" (Buffer.contents buf_res);
