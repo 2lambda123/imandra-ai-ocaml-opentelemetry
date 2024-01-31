@@ -537,6 +537,7 @@ module Backend(Arg : sig val config : Config.t end)()
           Ok ()
         with e ->
           Printf.eprintf "opentelemetry-curl: uncaught exception: %s\n%!" (Printexc.to_string e);
+        Error (`Failure (Printexc.to_string e))
           Error (`Failure (Printexc.to_string e))
         );
       match result with
