@@ -24,7 +24,7 @@ let set_mutex ~lock ~unlock : unit =
   lock_ := lock;
   unlock_ := unlock
 
-let container_id_ = ref None
+let container_id_ = ref (Some "")
 
 (** Read the container ID from [/proc/self/cgroup], if it exists, and send it in the [Datadog-Container-ID] HTTP header.
 
