@@ -151,7 +151,7 @@ module Curl() : CURL = struct
     let header =
       match !container_id_ with
       | None -> header
-      | Some cid -> Printf.sprintf "Datadog-Container-ID: %s" cid :: header
+      | Some cid -> "Datadog-Container-ID: " ^ cid :: header
     in
     Curl.set_httpheader curl header;
     (* write body *)
