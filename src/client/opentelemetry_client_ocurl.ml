@@ -531,8 +531,17 @@ module Backend(Arg : sig val config : Config.t end)()
     send=fun l ~over ~ret ->
       let@() = with_lock_ in
       if !debug_ then Format.eprintf "send spans %a@." (Format.pp_print_list Trace.pp_resource_spans) l;
-      push_trace l ~over;
-      ret()
+      let result =
+        (try
+          push_trace l ~over;
+          Ok ()
+        with e ->
+          Printf.eprintf "opentelemetry-curl: uncaught exception: %s\n%!" (Printexc.to_string e);
+          Error (`Failure (Printexc.to_string e))
+        );
+      match result with
+      | Ok () -> ret()
+      | Error err -> ret()
   }
 
   let last_sent_metrics = Atomic.make (Mtime_clock.now())
